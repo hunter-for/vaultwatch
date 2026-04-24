@@ -1,72 +1,78 @@
 package config
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Config holds the application configuration for vaultwatch.
+// Config holds all vaultwatch runtime configuration.
 type Config struct {
 	Vault   VaultConfig   `yaml:"vault"`
-	Alerts  AlertsConfig  `yaml:"alerts"`
 	Monitor MonitorConfig `yaml:"monitor"`
+	Alert   AlertConfig   `yaml:"alert"`
 }
 
-// VaultConfig contains Vault connection settings.
+// VaultConfig holds Vault connection settings.
 type VaultConfig struct {
-	Address   string `yaml:"address"`
-	Token     string `yaml:"token"`
-	Namespace string `yaml:"namespace"`
+	Address string `yaml:"address"`
+	Token   string `yaml:"token"`
 }
 
-// AlertsConfig defines alerting thresholds and channels.
-type AlertsConfig struct {
-	WarnBefore  time.Duration `yaml:"warn_before"`
-	SlackWebhook string       `yaml:"slack_webhook"`
-	Email        string       `yaml:"email"`
-}
-
-// MonitorConfig controls polling behavior.
+// MonitorConfig controls polling and threshold behaviour.
 type MonitorConfig struct {
-	Interval time.Duration `yaml:"interval"`
-	Paths    []string      `yaml:"paths"`
+	Interval        time.Duration `yaml:"interval"`
+	CriticalSeconds int           `yaml:"critical_seconds"`
+	WarningSeconds  int           `yaml:"warning_seconds"`
 }
 
-// Load reads and parses a YAML config file from the given path.
+// AlertConfig holds optional notification channel settings.
+type AlertConfig struct {
+	SlackWebhook    string `yaml:"slack_webhook"`
+	WebhookURL      string `yaml:"webhook_url"`
+	PagerDutyKey    string `yaml:"pagerduty_key"`
+	SMTPHost        string `yaml:"smtp_host"`
+	SMTPPort        int    `yaml:"smtp_port"`
+	SMTPFrom        string `yaml:"smtp_from"`
+	SMTPTo          string `yaml:"smtp_to"`
+	SMTPUsername    string `yaml:"smtp_username"`
+	SMTPPassword    string `yaml:"smtp_password"`
+}
+
+const (
+	defaultInterval        = 60 * time.Second
+	defaultCriticalSeconds = 300
+	defaultWarningSeconds  = 3600
+)
+
+// Load reads a YAML config file from path and applies defaults.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("reading config file %q: %w", path, err)
+		return nil, err
 	}
 
-	cfg := &Config{}
-	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("parsing config file %q: %w", path, err)
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
 	}
 
-	if err := cfg.validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+	if cfg.Vault.Address == "" {
+		return nil, errors.New("vault.address is required")
 	}
 
-	return cfg, nil
-}
+	// Apply defaults for optional numeric fields.
+	if cfg.Monitor.Interval <= 0 {
+		cfg.Monitor.Interval = defaultInterval
+	}
+	if cfg.Monitor.CriticalSeconds == 0 {
+		cfg.Monitor.CriticalSeconds = defaultCriticalSeconds
+	}
+	if cfg.Monitor.WarningSeconds == 0 {
+		cfg.Monitor.WarningSeconds = defaultWarningSeconds
+	}
 
-// validate checks that required fields are present and sensible.
-func (c *Config) validate() error {
-	if c.Vault.Address == "" {
-		return fmt.Errorf("vault.address is required")
-	}
-	if c.Vault.Token == "" {
-		return fmt.Errorf("vault.token is required")
-	}
-	if c.Monitor.Interval <= 0 {
-		c.Monitor.Interval = 60 * time.Second
-	}
-	if c.Alerts.WarnBefore <= 0 {
-		c.Alerts.WarnBefore = 24 * time.Hour
-	}
-	return nil
+	return &cfg, nil
 }
