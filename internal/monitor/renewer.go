@@ -51,6 +51,8 @@ func (r *LeaseRenewer) Renew(ctx context.Context, ls LeaseStatus, incrementSecon
 }
 
 // RenewAll attempts renewal for all leases in the slice, collecting errors.
+// It continues processing remaining leases even if individual renewals fail.
+// Returns nil if no errors occurred.
 func (r *LeaseRenewer) RenewAll(ctx context.Context, leases []LeaseStatus, incrementSeconds int) []error {
 	var errs []error
 	for _, ls := range leases {
@@ -59,4 +61,16 @@ func (r *LeaseRenewer) RenewAll(ctx context.Context, leases []LeaseStatus, incre
 		}
 	}
 	return errs
+}
+
+// RenewableCount returns the number of leases in the slice that are currently
+// eligible for renewal based on the renewer's leadway setting.
+func (r *LeaseRenewer) RenewableCount(leases []LeaseStatus) int {
+	count := 0
+	for _, ls := range leases {
+		if r.ShouldRenew(ls) {
+			count++
+		}
+	}
+	return count
 }
