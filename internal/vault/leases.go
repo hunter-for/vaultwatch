@@ -59,6 +59,10 @@ func (c *Client) ListLeases(prefix string) ([]string, error) {
 
 // GetLease fetches details for a single lease by ID.
 func (c *Client) GetLease(leaseID string) (*LeaseEntry, error) {
+	if leaseID == "" {
+		return nil, fmt.Errorf("leaseID must not be empty")
+	}
+
 	body, err := jsonBody(map[string]string{"lease_id": leaseID})
 	if err != nil {
 		return nil, fmt.Errorf("encoding request body: %w", err)
@@ -78,6 +82,9 @@ func (c *Client) GetLease(leaseID string) (*LeaseEntry, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusBadRequest {
+		return nil, fmt.Errorf("lease not found: %s", leaseID)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("lease lookup returned status %d", resp.StatusCode)
 	}
