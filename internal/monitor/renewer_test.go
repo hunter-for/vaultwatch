@@ -54,6 +54,14 @@ func TestLeaseRenewer_ShouldRenew_False_NotRenewable(t *testing.T) {
 	}
 }
 
+func TestLeaseRenewer_ShouldRenew_False_Expired(t *testing.T) {
+	r := NewLeaseRenewer(nil, 60*time.Second)
+	ls := renewableLeaseWithTTL("lease/expired", -5*time.Second)
+	if r.ShouldRenew(ls) {
+		t.Error("expected ShouldRenew false for already-expired lease")
+	}
+}
+
 func TestLeaseRenewer_Renew_CallsClient(t *testing.T) {
 	client := &mockRenewClient{failFor: map[string]bool{}}
 	r := NewLeaseRenewer(client, 60*time.Second)
