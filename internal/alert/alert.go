@@ -53,3 +53,15 @@ func (s *StdoutSender) Send(a Alert) error {
 	)
 	return err
 }
+
+// New creates an Alert with the current UTC time as its Timestamp.
+// It is a convenience constructor to avoid repeating time.Now() at call sites.
+func New(leaseID string, ttl time.Duration, severity Severity, message string) Alert {
+	return Alert{
+		LeaseID:   leaseID,
+		TTL:       ttl,
+		Severity:  severity,
+		Message:   message,
+		Timestamp: time.Now().UTC(),
+	}
+}
